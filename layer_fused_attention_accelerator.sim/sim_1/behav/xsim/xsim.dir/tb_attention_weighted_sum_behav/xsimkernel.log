@@ -1,0 +1,7 @@
+Running: xsim.dir/tb_attention_weighted_sum_behav/xsimk.exe -simmode gui -wdb tb_attention_weighted_sum_behav.wdb -simrunnum 0 -socket 64958
+Design successfully loaded
+Design Loading Memory Usage: 10028 KB (Peak: 10028 KB)
+Design Loading CPU Usage: 15 ms
+Simulation completed
+Simulation Memory Usage: 10952 KB (Peak: 10952 KB)
+Simulation CPU Usage: 46 ms

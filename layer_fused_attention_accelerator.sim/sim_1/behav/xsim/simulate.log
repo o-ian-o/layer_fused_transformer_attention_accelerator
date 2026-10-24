@@ -1,0 +1,19 @@
+Time resolution is 1 ps
+
+======================================
+LAYER-FUSED ATTENTION ACCELERATOR
+END-TO-END TEST
+======================================
+
+Accelerator completed.
+busy = 0
+done = 1
+
+Final attention output:
+2 1 0 0 
+1 1 1 1 
+1 1 1 1 
+1 1 1 1 
+
+End-to-end simulation completed.
+$finish called at time : 706 ns : File "C:/Users/Sharanya Reddy/layer_fused_attention_accelerator/Simulation Sources/tb_layer_fused_attention.sv" Line 168

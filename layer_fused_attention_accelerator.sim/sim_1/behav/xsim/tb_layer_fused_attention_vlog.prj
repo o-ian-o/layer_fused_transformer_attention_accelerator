@@ -1,0 +1,15 @@
+# compile verilog/system verilog design source files
+sv xil_defaultlib  --include "../../../../../../../AMDDesignTools/2025.2/Vivado/data/rsb/busdef" \
+"../../../../Design Sources/attention_weighted_sum.sv" \
+"../../../../Design Sources/exp_lut.sv" \
+"../../../../Design Sources/layer_fused_attention.sv" \
+"../../../../Design Sources/qk_matmul.sv" \
+"../../../../Design Sources/scale_unit.sv" \
+"../../../../Design Sources/softmax.sv" \
+"../../../../Simulation Sources/tb_layer_fused_attention.sv" \
+
+# compile glbl module
+verilog xil_defaultlib "glbl.v"
+
+# Do not sort compile order
+nosort

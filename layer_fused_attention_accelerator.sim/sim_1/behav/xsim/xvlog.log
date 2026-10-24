@@ -1,0 +1,4 @@
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Users/Sharanya Reddy/layer_fused_attention_accelerator/Design Sources/layer_fused_attention.sv" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module layer_fused_attention
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Users/Sharanya Reddy/layer_fused_attention_accelerator/Simulation Sources/tb_layer_fused_attention.sv" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module tb_layer_fused_attention
