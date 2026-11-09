@@ -1,0 +1,26 @@
+{
+  "model_name": "google-bert/bert-base-uncased",
+  "text": "The cat sat on the mat.",
+  "token_ids": [
+    101,
+    1996,
+    4937,
+    102
+  ],
+  "tokens": [
+    "[CLS]",
+    "the",
+    "cat",
+    "[SEP]"
+  ],
+  "sequence_length": 4,
+  "num_heads": 12,
+  "selected_head": 0,
+  "head_dimension": 64,
+  "torch_dtype": "torch.float32",
+  "numpy_dtype": "float32",
+  "quantization_scale": 128,
+  "rounding": "round-to-nearest, ties-to-even (numpy.rint)",
+  "seed": 42,
+  "attention_formula": "softmax(Q @ K.T / sqrt(64)) @ V"
+}

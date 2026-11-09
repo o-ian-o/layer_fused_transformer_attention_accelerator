@@ -1,6 +1,6 @@
 module layer_fused_attention #(
     parameter int N = 4,
-    parameter int D = 4,
+    parameter int D = 64,
     parameter int DATA_WIDTH = 16,
     parameter int ACC_WIDTH = 40,
     parameter int OUTPUT_WIDTH = 16
@@ -85,7 +85,7 @@ module layer_fused_attention #(
         .ACC_WIDTH(ACC_WIDTH),
         .FRAC_BITS(8),
         .OUT_WIDTH(ACC_WIDTH),
-        .SCALE_DENOM(2)
+        .SCALE_DENOM(131072)
     ) u_scale_unit (
         .scores(qk_scores),
         .scaled_scores(scaled_scores)

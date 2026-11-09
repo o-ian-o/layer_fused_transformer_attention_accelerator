@@ -1,6 +1,6 @@
 module qk_matmul #(
     parameter int N = 4,
-    parameter int D = 4,
+    parameter int D = 64,
     parameter int DATA_WIDTH = 16,
     parameter int ACC_WIDTH = 40
 ) (

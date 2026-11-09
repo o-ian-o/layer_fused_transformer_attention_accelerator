@@ -14,12 +14,12 @@ module exp_lut (
 
     always_comb begin
 
-        // Round the input difference to the nearest LUT step.
-        lut_index = (delta_q8 + 40'd16) >> 5;
-
-        // Saturate differences greater than 8.0.
-        if (lut_index > 8'd64)
+        // Saturate before adding the rounding offset, avoiding unsigned wrap.
+        // Index 64 is selected for delta >= 64*32 - 16 = 2032 Q8 units.
+        if (delta_q8 >= 40'd2032)
             lut_index = 8'd64;
+        else
+            lut_index = (delta_q8 + 40'd16) >> 5;
 
         case (lut_index)
 

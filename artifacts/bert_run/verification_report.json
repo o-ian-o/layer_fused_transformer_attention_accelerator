@@ -1,0 +1,29 @@
+{
+  "quantization": {
+    "scale": 128,
+    "rounding": "nearest ties-to-even",
+    "Q_max_abs_error": 0.0038895606994628906,
+    "K_max_abs_error": 0.0038843154907226562,
+    "V_max_abs_error": 0.003899693489074707
+  },
+  "attention": {
+    "max_abs_error_float_vs_fixed": 0.03444153070449829,
+    "mean_abs_error_float_vs_fixed": 0.005109287822062214
+  },
+  "ranges": {
+    "Q_int": [
+      -500,
+      254
+    ],
+    "K_int": [
+      -594,
+      562
+    ],
+    "V_int": [
+      -145,
+      304
+    ]
+  },
+  "rtl_compatibility": "NOT CLAIMED: apply and simulate the documented RTL changes first.",
+  "fixed_point_model": "Current exp_lut.sv LUT and integer truncation semantics; scale denominator 131072 with FRAC_BITS=8."
+}
