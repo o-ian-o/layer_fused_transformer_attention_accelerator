@@ -38,7 +38,7 @@ module qk_matmul #(
             j >= 0 && j < N &&
             d >= 0 && d < D) begin
 
-            product = q[i][d] * k[j][d];
+            product = $signed(q[i][d]) * $signed(k[j][d]);
         end
     end
 

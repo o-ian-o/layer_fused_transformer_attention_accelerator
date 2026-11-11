@@ -61,8 +61,13 @@ def sv_assignments(path: Path, arrays: dict[str, np.ndarray]):
             assert arr.shape == (4, 64)
             f.write(f"// {name.upper()} assignments\n")
             for i in range(4):
-                for j in range(64):
-                    f.write(f"{name}[{i}][{j}] = 16'sd{int(arr[i,j])};\n")
+                for j in range(64): 
+                    value = int(arr[i, j])
+                    if value < 0:
+                     literal = f"-16'sd{-value}"
+                    else:
+                     literal = f"16'sd{value}"
+                    f.write(f"{name}[{i}][{j}] = {literal};\n")
 
 def trunc_div_signed(n: np.ndarray, d: int) -> np.ndarray:
     """SV signed integer division truncates toward zero (not floor)."""
