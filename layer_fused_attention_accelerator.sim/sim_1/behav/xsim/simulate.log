@@ -1,19 +1,9 @@
 Time resolution is 1 ps
+BERT 4x64 attention RTL completed.
 
-======================================
-LAYER-FUSED ATTENTION ACCELERATOR
-END-TO-END TEST
-======================================
-
-Accelerator completed.
-busy = 0
-done = 1
-
-Final attention output:
-2 1 0 0 
-1 1 1 1 
-1 1 1 1 
-1 1 1 1 
-
-End-to-end simulation completed.
-$finish called at time : 706 ns : File "C:/Users/Sharanya Reddy/layer_fused_attention_accelerator/Simulation Sources/tb_layer_fused_attention.sv" Line 168
+Final attention output (from BRAM):
+54 98 9 0 -18 -68 33 31 9 4 -4 -54 -5 -29 21 50 29 -9 -18 -39 -25 49 29 27 31 26 5 -6 32 29 26 -9 21 -26 11 40 8 49 21 -32 68 9 -54 -4 11 -32 16 34 -65 -33 38 -35 17 -58 9 9 -11 68 18 11 -55 6 64 -19 
+92 112 13 2 -30 -54 41 11 10 -4 -18 -41 8 -40 10 48 10 0 -15 -24 -39 45 28 13 33 0 3 -5 19 37 19 9 37 -21 14 37 14 37 3 -5 38 -1 -45 -19 21 -25 28 69 -64 -32 30 -15 -2 -65 2 -3 -9 59 8 -10 -43 -10 52 -20 
+82 110 13 11 -22 -71 44 4 9 -10 -16 -44 -1 -41 26 46 5 -9 -11 -35 -31 40 22 23 37 3 6 -27 15 39 23 16 29 -29 27 33 10 38 7 0 40 -5 -38 -16 25 -15 23 60 -61 -34 39 -15 0 -63 -8 4 -3 63 11 -11 -42 -9 61 -11 
+96 122 9 -5 -28 -56 37 13 10 -1 -11 -49 10 -35 5 45 16 3 -13 -27 -38 51 30 15 34 7 2 1 29 35 17 -6 30 -20 8 42 14 36 6 -12 46 -6 -50 -9 17 -30 27 55 -62 -37 32 -17 0 -65 8 -2 -9 61 5 -3 -48 -7 50 x 
+$finish called at time : 38656 ns : File "C:/Users/hp/Documents/layer_fused_transformer_attention_accelerator/Simulation Sources/tb_bert_layer_fused_attention.sv" Line 78
