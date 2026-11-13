@@ -1,4 +1,14 @@
-INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Users/Sharanya Reddy/layer_fused_attention_accelerator/Design Sources/layer_fused_attention.sv" into library xil_defaultlib
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Users/hp/Documents/layer_fused_transformer_attention_accelerator/Design Sources/attention_weighted_sum.sv" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module attention_weighted_sum
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Users/hp/Documents/layer_fused_transformer_attention_accelerator/Design Sources/exp_lut.sv" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module exp_lut
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Users/hp/Documents/layer_fused_transformer_attention_accelerator/Design Sources/layer_fused_attention.sv" into library xil_defaultlib
 INFO: [VRFC 10-311] analyzing module layer_fused_attention
-INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Users/Sharanya Reddy/layer_fused_attention_accelerator/Simulation Sources/tb_layer_fused_attention.sv" into library xil_defaultlib
-INFO: [VRFC 10-311] analyzing module tb_layer_fused_attention
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Users/hp/Documents/layer_fused_transformer_attention_accelerator/Design Sources/qk_matmul.sv" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module qk_matmul
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Users/hp/Documents/layer_fused_transformer_attention_accelerator/Design Sources/scale_unit.sv" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module scale_unit
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Users/hp/Documents/layer_fused_transformer_attention_accelerator/Design Sources/softmax.sv" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module softmax
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Users/hp/Documents/layer_fused_transformer_attention_accelerator/Simulation Sources/tb_bert_layer_fused_attention.sv" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module tb_bert_layer_fused_attention

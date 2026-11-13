@@ -1,194 +1,184 @@
+`timescale 1ns / 1ps
+
 module layer_fused_attention #(
     parameter int N = 4,
     parameter int D = 64,
     parameter int DATA_WIDTH = 16,
     parameter int ACC_WIDTH = 40,
     parameter int OUTPUT_WIDTH = 16
-) (
+)(
     input  logic clk,
     input  logic reset,
     input  logic start,
 
-    input  logic signed [DATA_WIDTH-1:0]
-        q [0:N-1][0:D-1],
+    // BRAM Interface for Q (Read Only)
+    output logic [$clog2(N*D)-1:0] q_addr,
+    output logic q_en,
+    input  logic signed [DATA_WIDTH-1:0] q_dout,
 
-    input  logic signed [DATA_WIDTH-1:0]
-        k [0:N-1][0:D-1],
+    // BRAM Interface for K (Read Only)
+    output logic [$clog2(N*D)-1:0] k_addr,
+    output logic k_en,
+    input  logic signed [DATA_WIDTH-1:0] k_dout,
 
-    input  logic signed [DATA_WIDTH-1:0]
-        v [0:N-1][0:D-1],
+    // BRAM Interface for V (Read Only)
+    output logic [$clog2(N*D)-1:0] v_addr,
+    output logic v_en,
+    input  logic signed [DATA_WIDTH-1:0] v_dout,
 
-    output logic signed [OUTPUT_WIDTH-1:0]
-        output_matrix [0:N-1][0:D-1],
+    // BRAM Interface for Output (Write Only)
+    output logic [$clog2(N*D)-1:0] out_addr,
+    output logic out_en,
+    output logic out_we,
+    output logic signed [OUTPUT_WIDTH-1:0] out_din,
 
     output logic busy,
     output logic done
 );
 
-    // ------------------------------------------
-    // Internal signals
-    // ------------------------------------------
+    // Internal 2D arrays for intermediate pipeline logic
+    logic signed [DATA_WIDTH-1:0] v_reg [0:N-1][0:D-1];
+    logic signed [ACC_WIDTH-1:0] qk_scores [0:N-1][0:N-1];
+    logic signed [ACC_WIDTH-1:0] scaled_scores [0:N-1][0:N-1];
+    logic [15:0] attention_weights [0:N-1][0:N-1];
+    logic signed [OUTPUT_WIDTH-1:0] output_matrix [0:N-1][0:D-1];
 
-    logic qk_start;
-    logic qk_busy;
-    logic qk_done;
+    // qk_matmul signals
+    logic qk_start, qk_busy, qk_done;
+    logic [$clog2(N*N)-1:0] score_addr;
+    logic score_en, score_we;
+    logic signed [ACC_WIDTH-1:0] score_din;
+    
+    // attention_weighted_sum signals
+    logic aws_start, aws_busy, aws_done;
 
-    logic signed [ACC_WIDTH-1:0]
-        qk_scores [0:N-1][0:N-1];
-
-    logic signed [ACC_WIDTH-1:0]
-        scaled_scores [0:N-1][0:N-1];
-
-    logic [15:0]
-        attention_weights [0:N-1][0:N-1];
-
-
-    // ------------------------------------------
-    // Controller states
-    // ------------------------------------------
-
-    typedef enum logic {
-        IDLE,
-        WAIT_QK
-    } state_t;
-
-    state_t state;
-
-
-    // ------------------------------------------
-    // Stage 1: QK^T matrix multiplication
-    // ------------------------------------------
-
+    // Route Q and K external BRAM signals directly to qk_matmul
     qk_matmul #(
-        .N(N),
-        .D(D),
-        .DATA_WIDTH(DATA_WIDTH),
-        .ACC_WIDTH(ACC_WIDTH)
+        .N(N), .D(D), .DATA_WIDTH(DATA_WIDTH), .ACC_WIDTH(ACC_WIDTH)
     ) u_qk_matmul (
-        .clk(clk),
-        .reset(reset),
-        .start(qk_start),
-        .q(q),
-        .k(k),
-        .scores(qk_scores),
-        .busy(qk_busy),
-        .done(qk_done)
+        .clk(clk), .reset(reset), .start(qk_start),
+        .q_addr(q_addr), .q_en(q_en), .q_dout(q_dout),
+        .k_addr(k_addr), .k_en(k_en), .k_dout(k_dout),
+        .score_addr(score_addr), .score_en(score_en), .score_we(score_we), .score_din(score_din),
+        .busy(qk_busy), .done(qk_done)
     );
 
-
-    // ------------------------------------------
-    // Stage 2: Scale attention scores
-    // ------------------------------------------
-
+    // Combinational Pipeline Stages
     scale_unit #(
-        .N(N),
-        .ACC_WIDTH(ACC_WIDTH),
-        .FRAC_BITS(8),
-        .OUT_WIDTH(ACC_WIDTH),
-        .SCALE_DENOM(131072)
+        .N(N), .ACC_WIDTH(ACC_WIDTH), .FRAC_BITS(8),
+        .OUT_WIDTH(ACC_WIDTH), .SCALE_DENOM(131072)
     ) u_scale_unit (
         .scores(qk_scores),
         .scaled_scores(scaled_scores)
     );
 
-
-    // ------------------------------------------
-    // Stage 3: Softmax
-    // ------------------------------------------
-
     softmax #(
-        .N(N),
-        .SCORE_WIDTH(ACC_WIDTH),
-        .WEIGHT_WIDTH(16),
-        .SUM_WIDTH(20)
+        .N(N), .SCORE_WIDTH(ACC_WIDTH), .WEIGHT_WIDTH(16), .SUM_WIDTH(20)
     ) u_softmax (
         .scaled_scores(scaled_scores),
         .weights(attention_weights)
     );
 
-
-    // ------------------------------------------
-    // Stage 4: Attention weights multiplied by V
-    // ------------------------------------------
-
     attention_weighted_sum #(
-        .N(N),
-        .D(D),
-        .WEIGHT_WIDTH(16),
-        .VALUE_WIDTH(DATA_WIDTH),
-        .ACC_WIDTH(ACC_WIDTH),
-        .OUTPUT_WIDTH(OUTPUT_WIDTH)
+        .N(N), .D(D), .WEIGHT_WIDTH(16), .VALUE_WIDTH(DATA_WIDTH),
+        .ACC_WIDTH(ACC_WIDTH), .OUTPUT_WIDTH(OUTPUT_WIDTH)
     ) u_weighted_sum (
+        .clk(clk), .reset(reset), .start(aws_start),
         .weights(attention_weights),
-        .v(v),
-        .output_matrix(output_matrix)
+        .v(v_reg),
+        .output_matrix(output_matrix),
+        .busy(aws_busy), .done(aws_done)
     );
 
+    // Main Controller FSM
+    typedef enum logic [2:0] {
+        IDLE, LOAD_V_REQ, LOAD_V_SAVE, RUN_QK, WAIT_COMBO, RUN_AWS, WRITE_OUT
+    } state_t;
 
-    // ------------------------------------------
-    // Top-level controller
-    // ------------------------------------------
+    state_t state;
+    int count;
 
     always_ff @(posedge clk) begin
-
         if (reset) begin
-            state    <= IDLE;
-            qk_start <= 1'b0;
-            busy     <= 1'b0;
-            done     <= 1'b0;
-        end
+            state <= IDLE;
+            qk_start <= 0; aws_start <= 0;
+            v_addr <= 0; v_en <= 0;
+            out_addr <= 0; out_en <= 0; out_we <= 0; out_din <= 0;
+            busy <= 0; done <= 0; count <= 0;
+            for(int i=0; i<N; i++)
+                for(int j=0; j<N; j++) qk_scores[i][j] <= '0;
+        end else begin
+            qk_start <= 0; aws_start <= 0; v_en <= 0; out_en <= 0; out_we <= 0; done <= 0;
 
-        else begin
-
-            // Default values: pulses last one cycle.
-            qk_start <= 1'b0;
-            done     <= 1'b0;
+            // Capture QK scores generated by qk_matmul
+            if (score_en && score_we) begin
+                qk_scores[score_addr / N][score_addr % N] <= score_din;
+            end
 
             case (state)
-
                 IDLE: begin
-
-                    busy <= 1'b0;
-
                     if (start) begin
-
-                        qk_start <= 1'b1;
-                        busy     <= 1'b1;
-                        state    <= WAIT_QK;
-
+                        busy <= 1; count <= 0;
+                        v_addr <= 0; v_en <= 1;
+                        state <= LOAD_V_REQ;
                     end
-
                 end
-
-
-                WAIT_QK: begin
-
-                    busy <= 1'b1;
-
+                
+                LOAD_V_REQ: begin
+                    v_addr <= count;
+                    v_en <= 1;
+                    state <= LOAD_V_SAVE;
+                end
+                
+                LOAD_V_SAVE: begin
+                    v_reg[count / D][count % D] <= v_dout;
+                    if (count == N*D - 1) begin
+                        qk_start <= 1;
+                        state <= RUN_QK;
+                    end else begin
+                        count <= count + 1;
+                        state <= LOAD_V_REQ;
+                    end
+                end
+                
+                RUN_QK: begin
                     if (qk_done) begin
-
-                        busy  <= 1'b0;
-                        done  <= 1'b1;
-                        state <= IDLE;
-
+                        count <= 0;
+                        state <= WAIT_COMBO;
                     end
-
+                end
+                
+                WAIT_COMBO: begin
+                    // Wait 2 cycles for Scale & Softmax to settle
+                    if (count == 2) begin
+                        count <= 0;
+                        aws_start <= 1;
+                        state <= RUN_AWS;
+                    end else begin
+                        count <= count + 1;
+                    end
                 end
 
-
-                default: begin
-
-                    state    <= IDLE;
-                    qk_start <= 1'b0;
-                    busy     <= 1'b0;
-                    done     <= 1'b0;
-
+                RUN_AWS: begin
+                    if (aws_done) begin
+                        count <= 0;
+                        state <= WRITE_OUT;
+                    end
                 end
+                
+                WRITE_OUT: begin
+                    out_addr <= count;
+                    out_din <= output_matrix[count / D][count % D];
+                    out_en <= 1; out_we <= 1;
 
+                    if (count == N*D - 1) begin
+                        state <= IDLE;
+                        busy <= 0; done <= 1;
+                    end else begin
+                        count <= count + 1;
+                    end
+                end
             endcase
-
         end
-
     end
-
 endmodule
