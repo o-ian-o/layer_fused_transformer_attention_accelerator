@@ -92,7 +92,7 @@ module layer_fused_attention #(
 
     // Main Controller FSM
     typedef enum logic [2:0] {
-        IDLE, LOAD_V_REQ, LOAD_V_SAVE, RUN_QK, WAIT_COMBO, RUN_AWS, WRITE_OUT
+        IDLE, LOAD_V_REQ,LOAD_V_WAIT, LOAD_V_SAVE, RUN_QK, WAIT_COMBO, RUN_AWS, WRITE_OUT
     } state_t;
 
     state_t state;
@@ -125,20 +125,25 @@ module layer_fused_attention #(
                 end
                 
                 LOAD_V_REQ: begin
-                    v_addr <= count;
-                    v_en <= 1;
-                    state <= LOAD_V_SAVE;
+                       v_addr <= count;
+                       v_en <= 1;
+                       state <= LOAD_V_WAIT;
                 end
-                
+
+                LOAD_V_WAIT: begin
+                     state <= LOAD_V_SAVE;
+                end
+
                 LOAD_V_SAVE: begin
-                    v_reg[count / D][count % D] <= v_dout;
-                    if (count == N*D - 1) begin
-                        qk_start <= 1;
-                        state <= RUN_QK;
-                    end else begin
-                        count <= count + 1;
-                        state <= LOAD_V_REQ;
-                    end
+                     v_reg[count / D][count % D] <= v_dout;
+
+                     if (count == N*D - 1) begin
+                       qk_start <= 1;
+                       state <= RUN_QK;
+                     end else begin
+                    count <= count + 1;
+                    state <= LOAD_V_REQ;
+                   end
                 end
                 
                 RUN_QK: begin
@@ -167,6 +172,11 @@ module layer_fused_attention #(
                 end
                 
                 WRITE_OUT: begin
+                    $display(
+                        "OUTPUT CHECK: count=%0d, matrix_value=%0d",
+                         count,
+                         $signed(output_matrix[count / D][count % D])
+                    );
                     out_addr <= count;
                     out_din <= output_matrix[count / D][count % D];
                     out_en <= 1; out_we <= 1;
