@@ -36,159 +36,379 @@ module layer_fused_attention #(
     output logic done
 );
 
-    // Internal 2D arrays for intermediate pipeline logic
+    // Internal arrays
     logic signed [DATA_WIDTH-1:0] v_reg [0:N-1][0:D-1];
+
     logic signed [ACC_WIDTH-1:0] qk_scores [0:N-1][0:N-1];
+
+    // Combinational stage outputs
     logic signed [ACC_WIDTH-1:0] scaled_scores [0:N-1][0:N-1];
     logic [15:0] attention_weights [0:N-1][0:N-1];
+
+    // Pipeline registers
+    logic signed [ACC_WIDTH-1:0] scaled_scores_reg [0:N-1][0:N-1];
+    logic [15:0] attention_weights_reg [0:N-1][0:N-1];
+
     logic signed [OUTPUT_WIDTH-1:0] output_matrix [0:N-1][0:D-1];
 
-    // qk_matmul signals
+    // QK Matmul signals
     logic qk_start, qk_busy, qk_done;
+
     logic [$clog2(N*N)-1:0] score_addr;
     logic score_en, score_we;
+
     logic signed [ACC_WIDTH-1:0] score_din;
-    
-    // attention_weighted_sum signals
+
+    // Attention Weighted Sum signals
     logic aws_start, aws_busy, aws_done;
 
-    // Route Q and K external BRAM signals directly to qk_matmul
+
+    // --------------------------------------------------
+    // QK MATMUL
+    // --------------------------------------------------
+
     qk_matmul #(
-        .N(N), .D(D), .DATA_WIDTH(DATA_WIDTH), .ACC_WIDTH(ACC_WIDTH)
+        .N(N),
+        .D(D),
+        .DATA_WIDTH(DATA_WIDTH),
+        .ACC_WIDTH(ACC_WIDTH)
     ) u_qk_matmul (
-        .clk(clk), .reset(reset), .start(qk_start),
-        .q_addr(q_addr), .q_en(q_en), .q_dout(q_dout),
-        .k_addr(k_addr), .k_en(k_en), .k_dout(k_dout),
-        .score_addr(score_addr), .score_en(score_en), .score_we(score_we), .score_din(score_din),
-        .busy(qk_busy), .done(qk_done)
+        .clk(clk),
+        .reset(reset),
+        .start(qk_start),
+
+        .q_addr(q_addr),
+        .q_en(q_en),
+        .q_dout(q_dout),
+
+        .k_addr(k_addr),
+        .k_en(k_en),
+        .k_dout(k_dout),
+
+        .score_addr(score_addr),
+        .score_en(score_en),
+        .score_we(score_we),
+        .score_din(score_din),
+
+        .busy(qk_busy),
+        .done(qk_done)
     );
 
-    // Combinational Pipeline Stages
+
+    // --------------------------------------------------
+    // SCALE UNIT
+    // --------------------------------------------------
+
     scale_unit #(
-        .N(N), .ACC_WIDTH(ACC_WIDTH), .FRAC_BITS(8),
-        .OUT_WIDTH(ACC_WIDTH), .SCALE_DENOM(131072)
+        .N(N),
+        .ACC_WIDTH(ACC_WIDTH),
+        .FRAC_BITS(8),
+        .OUT_WIDTH(ACC_WIDTH),
+        .SCALE_DENOM(131072)
     ) u_scale_unit (
         .scores(qk_scores),
         .scaled_scores(scaled_scores)
     );
 
+
+    // --------------------------------------------------
+    // SOFTMAX
+    // --------------------------------------------------
+
     softmax #(
-        .N(N), .SCORE_WIDTH(ACC_WIDTH), .WEIGHT_WIDTH(16), .SUM_WIDTH(20)
+        .N(N),
+        .SCORE_WIDTH(ACC_WIDTH),
+        .WEIGHT_WIDTH(16),
+        .SUM_WIDTH(20)
     ) u_softmax (
-        .scaled_scores(scaled_scores),
+        .scaled_scores(scaled_scores_reg),
         .weights(attention_weights)
     );
 
+
+    // --------------------------------------------------
+    // ATTENTION WEIGHTED SUM
+    // --------------------------------------------------
+
     attention_weighted_sum #(
-        .N(N), .D(D), .WEIGHT_WIDTH(16), .VALUE_WIDTH(DATA_WIDTH),
-        .ACC_WIDTH(ACC_WIDTH), .OUTPUT_WIDTH(OUTPUT_WIDTH)
+        .N(N),
+        .D(D),
+        .WEIGHT_WIDTH(16),
+        .VALUE_WIDTH(DATA_WIDTH),
+        .ACC_WIDTH(ACC_WIDTH),
+        .OUTPUT_WIDTH(OUTPUT_WIDTH)
     ) u_weighted_sum (
-        .clk(clk), .reset(reset), .start(aws_start),
-        .weights(attention_weights),
+        .clk(clk),
+        .reset(reset),
+        .start(aws_start),
+
+        .weights(attention_weights_reg),
         .v(v_reg),
+
         .output_matrix(output_matrix),
-        .busy(aws_busy), .done(aws_done)
+
+        .busy(aws_busy),
+        .done(aws_done)
     );
 
-    // Main Controller FSM
+
+    // --------------------------------------------------
+    // MAIN CONTROLLER FSM
+    // --------------------------------------------------
+
     typedef enum logic [2:0] {
-        IDLE, LOAD_V_REQ,LOAD_V_WAIT, LOAD_V_SAVE, RUN_QK, WAIT_COMBO, RUN_AWS, WRITE_OUT
+        IDLE,
+        LOAD_V_REQ,
+        LOAD_V_WAIT,
+        LOAD_V_SAVE,
+        RUN_QK,
+        WAIT_COMBO,
+        RUN_AWS,
+        WRITE_OUT
     } state_t;
 
     state_t state;
+
     int count;
 
+
     always_ff @(posedge clk) begin
+
         if (reset) begin
+
             state <= IDLE;
-            qk_start <= 0; aws_start <= 0;
-            v_addr <= 0; v_en <= 0;
-            out_addr <= 0; out_en <= 0; out_we <= 0; out_din <= 0;
-            busy <= 0; done <= 0; count <= 0;
-            for(int i=0; i<N; i++)
-                for(int j=0; j<N; j++) qk_scores[i][j] <= '0;
+
+            qk_start <= 0;
+            aws_start <= 0;
+
+            v_addr <= 0;
+            v_en <= 0;
+
+            out_addr <= 0;
+            out_en <= 0;
+            out_we <= 0;
+            out_din <= 0;
+
+            busy <= 0;
+            done <= 0;
+
+            count <= 0;
+
+            // Reset intermediate pipeline arrays
+            for (int i = 0; i < N; i++) begin
+                for (int j = 0; j < N; j++) begin
+
+                    qk_scores[i][j] <= '0;
+
+                    scaled_scores_reg[i][j] <= '0;
+
+                    attention_weights_reg[i][j] <= '0;
+
+                end
+            end
+
         end else begin
-            qk_start <= 0; aws_start <= 0; v_en <= 0; out_en <= 0; out_we <= 0; done <= 0;
+
+            qk_start <= 0;
+            aws_start <= 0;
+
+            v_en <= 0;
+
+            out_en <= 0;
+            out_we <= 0;
+
+            done <= 0;
+
 
             // Capture QK scores generated by qk_matmul
             if (score_en && score_we) begin
-                qk_scores[score_addr / N][score_addr % N] <= score_din;
+
+                qk_scores[score_addr / N][score_addr % N]
+                    <= score_din;
+
             end
 
+
             case (state)
+
+                // --------------------------------------
+                // IDLE
+                // --------------------------------------
+
                 IDLE: begin
+
                     if (start) begin
-                        busy <= 1; count <= 0;
-                        v_addr <= 0; v_en <= 1;
+
+                        busy <= 1;
+
+                        count <= 0;
+
+                        v_addr <= 0;
+                        v_en <= 1;
+
                         state <= LOAD_V_REQ;
+
                     end
+
                 end
-                
+
+
+                // --------------------------------------
+                // LOAD V REQUEST
+                // --------------------------------------
+
                 LOAD_V_REQ: begin
-                       v_addr <= count;
-                       v_en <= 1;
-                       state <= LOAD_V_WAIT;
+
+                    v_addr <= count;
+
+                    v_en <= 1;
+
+                    state <= LOAD_V_WAIT;
+
                 end
+
+
+                // --------------------------------------
+                // WAIT FOR BRAM
+                // --------------------------------------
 
                 LOAD_V_WAIT: begin
-                     state <= LOAD_V_SAVE;
+
+                    state <= LOAD_V_SAVE;
+
                 end
+
+
+                // --------------------------------------
+                // SAVE V DATA
+                // --------------------------------------
 
                 LOAD_V_SAVE: begin
-                     v_reg[count / D][count % D] <= v_dout;
 
-                     if (count == N*D - 1) begin
-                       qk_start <= 1;
-                       state <= RUN_QK;
-                     end else begin
-                    count <= count + 1;
-                    state <= LOAD_V_REQ;
-                   end
-                end
-                
-                RUN_QK: begin
-                    if (qk_done) begin
-                        count <= 0;
-                        state <= WAIT_COMBO;
-                    end
-                end
-                
-                WAIT_COMBO: begin
-                    // Wait 2 cycles for Scale & Softmax to settle
-                    if (count == 2) begin
-                        count <= 0;
-                        aws_start <= 1;
-                        state <= RUN_AWS;
-                    end else begin
-                        count <= count + 1;
-                    end
-                end
-
-                RUN_AWS: begin
-                    if (aws_done) begin
-                        count <= 0;
-                        state <= WRITE_OUT;
-                    end
-                end
-                
-                WRITE_OUT: begin
-                    $display(
-                        "OUTPUT CHECK: count=%0d, matrix_value=%0d",
-                         count,
-                         $signed(output_matrix[count / D][count % D])
-                    );
-                    out_addr <= count;
-                    out_din <= output_matrix[count / D][count % D];
-                    out_en <= 1; out_we <= 1;
+                    v_reg[count / D][count % D] <= v_dout;
 
                     if (count == N*D - 1) begin
-                        state <= IDLE;
-                        busy <= 0; done <= 1;
+
+                        qk_start <= 1;
+
+                        state <= RUN_QK;
+
                     end else begin
+
                         count <= count + 1;
+
+                        state <= LOAD_V_REQ;
+
                     end
+
                 end
+
+
+                // --------------------------------------
+                // RUN QK MATMUL
+                // --------------------------------------
+
+                RUN_QK: begin
+
+                    if (qk_done) begin
+
+                        count <= 0;
+
+                        state <= WAIT_COMBO;
+
+                    end
+
+                end
+
+
+                // --------------------------------------
+                // PIPELINED SCALE + SOFTMAX
+                // --------------------------------------
+
+                WAIT_COMBO: begin
+
+                    // Stage 1: Register scaled scores
+                    if (count == 0) begin
+
+                        scaled_scores_reg <= scaled_scores;
+
+                        count <= 1;
+
+                    end
+
+                    // Stage 2: Register attention weights
+                    else if (count == 1) begin
+
+                        attention_weights_reg <= attention_weights;
+
+                        count <= 0;
+
+                        aws_start <= 1;
+
+                        state <= RUN_AWS;
+
+                    end
+
+                end
+
+
+                // --------------------------------------
+                // RUN ATTENTION WEIGHTED SUM
+                // --------------------------------------
+
+                RUN_AWS: begin
+
+                    if (aws_done) begin
+
+                        count <= 0;
+
+                        state <= WRITE_OUT;
+
+                    end
+
+                end
+
+
+                // --------------------------------------
+                // WRITE OUTPUT TO BRAM
+                // --------------------------------------
+
+                WRITE_OUT: begin
+
+                    $display(
+                        "OUTPUT CHECK: count=%0d, matrix_value=%0d",
+                        count,
+                        $signed(output_matrix[count / D][count % D])
+                    );
+
+                    out_addr <= count;
+
+                    out_din <= output_matrix[count / D][count % D];
+
+                    out_en <= 1;
+                    out_we <= 1;
+
+
+                    if (count == N*D - 1) begin
+
+                        state <= IDLE;
+
+                        busy <= 0;
+
+                        done <= 1;
+
+                    end else begin
+
+                        count <= count + 1;
+
+                    end
+
+                end
+
             endcase
+
         end
+
     end
+
 endmodule
